@@ -1,0 +1,38 @@
+---
+title: "pandoc-cite integration test"
+format: html
+filters:
+  - pandoc-cite
+---
+
+This document exercises every supported citation prefix.
+
+## DOI
+
+Nature paper on CRISPR [@doi:10.1038/nature12373].
+
+## arXiv
+
+Transformer architecture paper [@arxiv:1706.03762].
+
+## PubMed
+
+Classic nature paper via PubMed [@pmid:25015390].
+
+## PubMed Central
+
+PMC article [@pmcid:PMC4406347].
+
+## ISBN
+
+The Structure of Scientific Revolutions [@isbn:9780226458113].
+
+## URL
+
+Quarto filters documentation [@url:https://quarto.org/docs/extensions/filters.html].
+
+## Wikidata
+
+Douglas Adams via Wikidata [@wikidata:Q42].
+
+## References

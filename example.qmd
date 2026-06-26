@@ -1,0 +1,22 @@
+---
+title: "pandoc-cite example"
+format: html
+filters:
+  - pandoc-cite
+---
+
+## Examples
+
+DOI citation [@doi:10.1038/nature12373].
+
+arXiv preprint [@arxiv:1706.03762].
+
+PubMed article [@pmid:25015390].
+
+ISBN book [@isbn:9780262033848].
+
+URL webpage [@url:https://quarto.org/docs/extensions/filters.html].
+
+Wikidata entity [@wikidata:Q42].
+
+## References

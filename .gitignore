@@ -1,0 +1,7 @@
+/.quarto/
+**/*.quarto_ipynb
+.citation-cache/
+tests/.citation-cache/
+tests/_output/
+_output/
+.DS_Store
