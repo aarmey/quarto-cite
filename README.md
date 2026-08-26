@@ -1,5 +1,7 @@
 # Quarto Cite
 
+![Test](https://github.com/aarmey/quarto-cite/actions/workflows/test.yml/badge.svg)
+
 A Quarto/Pandoc Lua filter that resolves typed citation keys—such as DOIs,
 arXiv IDs, PubMed IDs, ISBNs, and URLs—to full bibliographic entries
 automatically, without requiring any Python or external tools beyond `curl`.
