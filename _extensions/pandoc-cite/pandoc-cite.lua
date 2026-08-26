@@ -8,26 +8,26 @@
 -- Requires: Pandoc >= 3.1, curl on PATH, internet access for uncached keys.
 
 local system = require("pandoc.system")
-local path   = require("pandoc.path")
+local path = require("pandoc.path")
 
 -- ---------------------------------------------------------------------------
 -- Configuration (overridable via document metadata)
 -- ---------------------------------------------------------------------------
 
 local DEFAULT_CACHE_DIR = ".citation-cache"
-local CACHE_DIR         = DEFAULT_CACHE_DIR   -- may be updated from meta
-local BIB_FILENAME      = "pandoc-cite-bibliography.json"
+local CACHE_DIR = DEFAULT_CACHE_DIR -- may be updated from meta
+local BIB_FILENAME = "pandoc-cite-bibliography.json"
 
 local SUPPORTED_PREFIXES = {
-  doi      = true,
-  arxiv    = true,
-  pmid     = true,
-  pmcid    = true,
-  isbn     = true,
-  url      = true,
+  doi = true,
+  arxiv = true,
+  pmid = true,
+  pmcid = true,
+  isbn = true,
+  url = true,
   wikidata = true,
-  http     = true,   -- bare http://… citekeys
-  https    = true,   -- bare https://… citekeys
+  http = true, -- bare http://… citekeys
+  https = true, -- bare https://… citekeys
 }
 
 -- ---------------------------------------------------------------------------
@@ -47,10 +47,9 @@ end
 
 local function xml_unescape(s)
   if type(s) ~= "string" then return s end
-  return s
-    :gsub("&amp;",  "&")
-    :gsub("&lt;",   "<")
-    :gsub("&gt;",   ">")
+  return s:gsub("&amp;", "&")
+    :gsub("&lt;", "<")
+    :gsub("&gt;", ">")
     :gsub("&quot;", '"')
     :gsub("&apos;", "'")
 end
@@ -66,7 +65,7 @@ end
 
 -- Run curl and return the response body, or nil on error.
 local function http_get(url, headers)
-  local args = {"-sS", "-L", "--max-time", "30"}
+  local args = { "-sS", "-L", "--max-time", "30" }
   if headers then
     for k, v in pairs(headers) do
       args[#args + 1] = "-H"
@@ -76,9 +75,7 @@ local function http_get(url, headers)
   args[#args + 1] = "--"
   args[#args + 1] = url
   local ok, result = pcall(pandoc.pipe, "curl", args, "")
-  if ok and result and result ~= "" then
-    return result
-  end
+  if ok and result and result ~= "" then return result end
   return nil
 end
 
@@ -87,8 +84,8 @@ end
 -- ---------------------------------------------------------------------------
 
 local function cache_item_path(prefix, accession)
-  local subdir = path.join({CACHE_DIR, prefix})
-  return path.join({subdir, safe_filename(accession) .. ".json"})
+  local subdir = path.join({ CACHE_DIR, prefix })
+  return path.join({ subdir, safe_filename(accession) .. ".json" })
 end
 
 local function cache_read(prefix, accession)
@@ -104,7 +101,7 @@ local function cache_read(prefix, accession)
 end
 
 local function cache_write(prefix, accession, data)
-  local subdir = path.join({CACHE_DIR, prefix})
+  local subdir = path.join({ CACHE_DIR, prefix })
   system.make_directory(subdir, true)
   local p = cache_item_path(prefix, accession)
   local ok, encoded = pcall(pandoc.json.encode, data)
@@ -125,19 +122,19 @@ local function parse_name(name)
   if not name or name == "" then return nil end
   -- "Family, Given" format
   local family, given = name:match("^([^,]+),%s*(.+)$")
-  if family then
-    return {family = trim(family), given = trim(given)}
-  end
+  if family then return { family = trim(family), given = trim(given) } end
   -- "Given Family" — last token is family
   local parts = {}
-  for tok in name:gmatch("%S+") do parts[#parts + 1] = tok end
+  for tok in name:gmatch("%S+") do
+    parts[#parts + 1] = tok
+  end
   if #parts == 1 then
-    return {family = parts[1]}
+    return { family = parts[1] }
   elseif #parts >= 2 then
     local fam = table.remove(parts)
-    return {family = fam, given = table.concat(parts, " ")}
+    return { family = fam, given = table.concat(parts, " ") }
   end
-  return {literal = name}
+  return { literal = name }
 end
 
 local function mediawiki_authors(author_list)
@@ -147,10 +144,8 @@ local function mediawiki_authors(author_list)
     if type(a) == "table" then
       local entry = {}
       entry.family = a.last or a.family
-      entry.given  = a.first or a.given
-      if not entry.family and a.name then
-        entry = parse_name(a.name)
-      end
+      entry.given = a.first or a.given
+      if not entry.family and a.name then entry = parse_name(a.name) end
       if entry then out[#out + 1] = entry end
     elseif type(a) == "string" then
       local entry = parse_name(a)
@@ -166,21 +161,21 @@ end
 -- ---------------------------------------------------------------------------
 
 local CROSSREF_TO_CSL_TYPE = {
-  ["journal-article"]       = "article-journal",
-  ["proceedings-article"]   = "paper-conference",
-  ["book-chapter"]          = "chapter",
-  ["book-section"]          = "chapter",
-  ["book-part"]             = "chapter",
-  ["edited-book"]           = "book",
-  ["reference-book"]        = "book",
-  ["monograph"]             = "book",
-  ["dissertation"]          = "thesis",
-  ["dataset"]               = "dataset",
-  ["posted-content"]        = "article",  -- preprint
-  ["report"]                = "report",
-  ["standard"]              = "standard",
-  ["peer-review"]           = "review",
-  ["other"]                 = "document",
+  ["journal-article"] = "article-journal",
+  ["proceedings-article"] = "paper-conference",
+  ["book-chapter"] = "chapter",
+  ["book-section"] = "chapter",
+  ["book-part"] = "chapter",
+  ["edited-book"] = "book",
+  ["reference-book"] = "book",
+  ["monograph"] = "book",
+  ["dissertation"] = "thesis",
+  ["dataset"] = "dataset",
+  ["posted-content"] = "article", -- preprint
+  ["report"] = "report",
+  ["standard"] = "standard",
+  ["peer-review"] = "review",
+  ["other"] = "document",
 }
 
 local function normalize_type(t)
@@ -195,7 +190,7 @@ end
 -- ---------------------------------------------------------------------------
 
 local function fetch_doi(doi)
-  local url    = "https://doi.org/" .. doi
+  local url = "https://doi.org/" .. doi
   local result = http_get(url, {
     ["Accept"] = "application/vnd.citationstyles.csl+json",
   })
@@ -229,17 +224,17 @@ end
 local function fetch_arxiv(arxiv_id)
   -- Strip trailing version for canonical URL but keep for API query
   local base_id = arxiv_id:match("^(.-)v%d+$") or arxiv_id
-  local url     = "https://export.arxiv.org/api/query?id_list=" .. base_id
-  local result  = http_get(url, {})
+  local url = "https://export.arxiv.org/api/query?id_list=" .. base_id
+  local result = http_get(url, {})
   if not result then return nil end
 
   local entry = result:match("<entry>(.-)</entry>")
   if not entry then return nil end
 
-  local title     = xml_extract(entry, "title")
+  local title = xml_extract(entry, "title")
   local published = xml_extract(entry, "published")
-  local abstract  = xml_extract(entry, "summary")
-  local doi       = xml_extract(entry, "doi")
+  local abstract = xml_extract(entry, "summary")
+  local doi = xml_extract(entry, "doi")
 
   -- Parse date
   local year, month, day
@@ -258,22 +253,22 @@ local function fetch_arxiv(arxiv_id)
   end
 
   -- Canonical arXiv ID from <id> element
-  local id_url  = xml_extract(entry, "id")
-  local canon   = (id_url and id_url:match("abs/(.+)$")) or arxiv_id
+  local id_url = xml_extract(entry, "id")
+  local canon = (id_url and id_url:match("abs/(.+)$")) or arxiv_id
 
   local item = {
-    type               = "article",
-    title              = title,
-    author             = authors,
-    abstract           = abstract,
+    type = "article",
+    title = title,
+    author = authors,
+    abstract = abstract,
     ["container-title"] = "arXiv",
-    publisher          = "arXiv",
-    URL                = "https://arxiv.org/abs/" .. canon,
-    number             = canon,
+    publisher = "arXiv",
+    URL = "https://arxiv.org/abs/" .. canon,
+    number = canon,
   }
   if doi then item.DOI = doi end
   if year then
-    item.issued = {["date-parts"] = {{tonumber(year), tonumber(month), tonumber(day)}}}
+    item.issued = { ["date-parts"] = { { tonumber(year), tonumber(month), tonumber(day) } } }
   end
   return item
 end
@@ -285,13 +280,11 @@ end
 -- ---------------------------------------------------------------------------
 
 local function fetch_pmid(pmid)
-  local url    = "https://api.ncbi.nlm.nih.gov/lit/ctxp/v1/pubmed/?id=" .. pmid .. "&format=csl"
+  local url = "https://api.ncbi.nlm.nih.gov/lit/ctxp/v1/pubmed/?id=" .. pmid .. "&format=csl"
   local result = http_get(url, {})
   if not result then return nil end
   local ok, data = pcall(pandoc.json.decode, result)
-  if ok and type(data) == "table" and not data.error then
-    return data
-  end
+  if ok and type(data) == "table" and not data.error then return data end
   return nil
 end
 
@@ -301,13 +294,11 @@ end
 
 local function fetch_pmcid(pmcid)
   local id = pmcid:match("^PMC(.+)$") or pmcid
-  local url    = "https://api.ncbi.nlm.nih.gov/lit/ctxp/v1/pmc/?id=" .. id .. "&format=csl"
+  local url = "https://api.ncbi.nlm.nih.gov/lit/ctxp/v1/pmc/?id=" .. id .. "&format=csl"
   local result = http_get(url, {})
   if not result then return nil end
   local ok, data = pcall(pandoc.json.decode, result)
-  if ok and type(data) == "table" and not data.error then
-    return data
-  end
+  if ok and type(data) == "table" and not data.error then return data end
   return nil
 end
 
@@ -322,7 +313,7 @@ local function fetch_isbn(isbn)
 
   -- Try Wikipedia Citoid
   local citoid_url = "https://en.wikipedia.org/api/rest_v1/data/citation/mediawiki/" .. clean
-  local result     = http_get(citoid_url, {["Accept"] = "application/json"})
+  local result = http_get(citoid_url, { ["Accept"] = "application/json" })
   if result then
     local ok, data = pcall(pandoc.json.decode, result)
     if ok and type(data) == "table" then
@@ -331,22 +322,24 @@ local function fetch_isbn(isbn)
         local year
         if d.date then year = d.date:match("(%d%d%d%d)") end
         local item = {
-          type              = "book",
-          title             = d.title,
-          author            = mediawiki_authors(d.author),
-          publisher         = d.publisher,
+          type = "book",
+          title = d.title,
+          author = mediawiki_authors(d.author),
+          publisher = d.publisher,
           ["publisher-place"] = d.place,
-          edition           = d.edition,
-          ISBN              = isbn,
+          edition = d.edition,
+          ISBN = isbn,
         }
-        if year then item.issued = {["date-parts"] = {{tonumber(year)}}} end
+        if year then item.issued = { ["date-parts"] = { { tonumber(year) } } } end
         return item
       end
     end
   end
 
   -- Fallback: OpenLibrary
-  local ol_url = "https://openlibrary.org/api/books?bibkeys=ISBN:" .. clean .. "&format=json&jscmd=data"
+  local ol_url = "https://openlibrary.org/api/books?bibkeys=ISBN:"
+    .. clean
+    .. "&format=json&jscmd=data"
   result = http_get(ol_url, {})
   if result then
     local ok, data = pcall(pandoc.json.decode, result)
@@ -361,18 +354,16 @@ local function fetch_isbn(isbn)
           end
         end
         local year
-        if entry.publish_date then
-          year = entry.publish_date:match("(%d%d%d%d)")
-        end
+        if entry.publish_date then year = entry.publish_date:match("(%d%d%d%d)") end
         local item = {
-          type      = "book",
-          title     = entry.title,
-          author    = authors,
+          type = "book",
+          title = entry.title,
+          author = authors,
           publisher = entry.publishers and entry.publishers[1] and entry.publishers[1].name,
-          ISBN      = isbn,
-          URL       = entry.url,
+          ISBN = isbn,
+          URL = entry.url,
         }
-        if year then item.issued = {["date-parts"] = {{tonumber(year)}}} end
+        if year then item.issued = { ["date-parts"] = { { tonumber(year) } } } end
         return item
       end
     end
@@ -389,14 +380,14 @@ end
 
 local function today_date_parts()
   local t = os.date("*t")
-  return {{t.year, t.month, t.mday}}
+  return { { t.year, t.month, t.mday } }
 end
 
 local function fetch_url(url_str)
   -- Try Citoid
-  local encoded    = urlencode(url_str)
+  local encoded = urlencode(url_str)
   local citoid_url = "https://en.wikipedia.org/api/rest_v1/data/citation/mediawiki/" .. encoded
-  local result     = http_get(citoid_url, {["Accept"] = "application/json"})
+  local result = http_get(citoid_url, { ["Accept"] = "application/json" })
   if result then
     local ok, data = pcall(pandoc.json.decode, result)
     if ok and type(data) == "table" then
@@ -405,14 +396,14 @@ local function fetch_url(url_str)
         local year
         if d.date then year = d.date:match("(%d%d%d%d)") end
         local item = {
-          type               = d.itemType or "webpage",
-          title              = d.title,
-          author             = mediawiki_authors(d.author),
-          URL                = url_str,
+          type = d.itemType or "webpage",
+          title = d.title,
+          author = mediawiki_authors(d.author),
+          URL = url_str,
           ["container-title"] = d.websiteTitle or d["container-title"],
-          accessed           = {["date-parts"] = today_date_parts()},
+          accessed = { ["date-parts"] = today_date_parts() },
         }
-        if year then item.issued = {["date-parts"] = {{tonumber(year)}}} end
+        if year then item.issued = { ["date-parts"] = { { tonumber(year) } } } end
         return item
       end
     end
@@ -420,9 +411,9 @@ local function fetch_url(url_str)
 
   -- Fallback
   return {
-    type     = "webpage",
-    URL      = url_str,
-    accessed = {["date-parts"] = today_date_parts()},
+    type = "webpage",
+    URL = url_str,
+    accessed = { ["date-parts"] = today_date_parts() },
   }
 end
 
@@ -432,8 +423,8 @@ end
 -- ---------------------------------------------------------------------------
 
 local function fetch_wikidata(qid)
-  local url    = "https://www.wikidata.org/wiki/Special:EntityData/" .. qid .. ".json"
-  local result = http_get(url, {["Accept"] = "application/json"})
+  local url = "https://www.wikidata.org/wiki/Special:EntityData/" .. qid .. ".json"
+  local result = http_get(url, { ["Accept"] = "application/json" })
   if not result then return nil end
   local ok, data = pcall(pandoc.json.decode, result)
   if not ok then return nil end
@@ -443,31 +434,34 @@ local function fetch_wikidata(qid)
 
   -- English label as title
   local labels = entity.labels or {}
-  local title  = (labels.en and labels.en.value)
+  local title = (labels.en and labels.en.value)
   if not title then
-    for _, v in pairs(labels) do title = v.value; break end
+    for _, v in pairs(labels) do
+      title = v.value
+      break
+    end
   end
 
   -- Type from instanceOf (P31)
   local csl_type = "entry"
-  local claims   = entity.claims or {}
-  local p31      = claims.P31
+  local claims = entity.claims or {}
+  local p31 = claims.P31
   if p31 and p31[1] then
     local v = p31[1].mainsnak and p31[1].mainsnak.datavalue
     if v and v.type == "wikibase-entityid" then
       local id = v.value["numeric-id"]
       -- Q571=book, Q13442814=scholarly article, Q732577=publication
-      local book_types    = {[571]=true, [3331189]=true}
-      local article_types = {[13442814]=true, [191067]=true}
-      if book_types[id]    then csl_type = "book"    end
+      local book_types = { [571] = true, [3331189] = true }
+      local article_types = { [13442814] = true, [191067] = true }
+      if book_types[id] then csl_type = "book" end
       if article_types[id] then csl_type = "article-journal" end
     end
   end
 
   return {
-    type      = csl_type,
-    title     = title or qid,
-    URL       = "https://www.wikidata.org/wiki/" .. qid,
+    type = csl_type,
+    title = title or qid,
+    URL = "https://www.wikidata.org/wiki/" .. qid,
     publisher = "Wikidata",
   }
 end
@@ -499,9 +493,7 @@ local function fetch_citekey(prefix, accession)
     item = fetch_wikidata(accession)
   end
 
-  if item then
-    cache_write(prefix, accession, item)
-  end
+  if item then cache_write(prefix, accession, item) end
   return item, false
 end
 
@@ -525,14 +517,14 @@ local function build_references_meta(csl_items, existing_meta_refs)
     -- existing_meta_refs is already in MetaValue form; we can't easily merge
     -- with our JSON list, so we let the round-trip handle only new items and
     -- merge at the MetaList level afterwards.
-    combined = csl_items   -- existing refs handled separately below
+    combined = csl_items -- existing refs handled separately below
   end
 
-  local yaml_src  = "---\nreferences: " .. json_str .. "\n---\n"
+  local yaml_src = "---\nreferences: " .. json_str .. "\n---\n"
   local ok2, tmp_doc = pcall(pandoc.read, yaml_src, "markdown")
   if not ok2 or not tmp_doc.meta.references then return nil end
 
-  local refs = tmp_doc.meta.references   -- MetaList from the JSON round-trip
+  local refs = tmp_doc.meta.references -- MetaList from the JSON round-trip
 
   -- Prepend any pre-existing front-matter references
   if existing_meta_refs and existing_meta_refs.t == "MetaList" then
@@ -552,7 +544,7 @@ end
 -- Write the combined CSL JSON to the cache (for inspection/reproducibility).
 local function write_bib_cache(csl_items)
   system.make_directory(CACHE_DIR, true)
-  local bib_path = path.join({CACHE_DIR, BIB_FILENAME})
+  local bib_path = path.join({ CACHE_DIR, BIB_FILENAME })
   local ok, encoded = pcall(pandoc.json.encode, csl_items)
   if not ok then return end
   local f = io.open(bib_path, "w")
@@ -575,8 +567,8 @@ function Pandoc(doc)
   end
 
   -- Collect all Cite nodes
-  local seen     = {}
-  local citekeys = {}   -- ordered list for deterministic output
+  local seen = {}
+  local citekeys = {} -- ordered list for deterministic output
 
   doc:walk({
     Cite = function(el)
@@ -586,7 +578,7 @@ function Pandoc(doc)
           local prefix, accession = id:match("^([a-z][a-z%+%-%.]*):(.*)")
           if prefix and SUPPORTED_PREFIXES[prefix] then
             seen[id] = true
-            citekeys[#citekeys + 1] = {id = id, prefix = prefix, accession = accession}
+            citekeys[#citekeys + 1] = { id = id, prefix = prefix, accession = accession }
           end
         end
       end
@@ -624,9 +616,7 @@ function Pandoc(doc)
   -- so that numeric date-parts and other structured values are encoded exactly
   -- as Pandoc's YAML parser would produce them (which citeproc expects).
   local refs_meta = build_references_meta(csl_items, meta.references)
-  if refs_meta then
-    meta.references = refs_meta
-  end
+  if refs_meta then meta.references = refs_meta end
 
   -- Run citeproc now so citations are resolved before Quarto's own pass.
   -- Quarto's citeproc sees already-formatted inline spans and is a no-op.
