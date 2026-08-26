@@ -300,12 +300,26 @@ bash tests/run_tests.sh --integration
 Unit tests run via `pandoc lua tests/unit_tests.lua` and cover:
 
 - String utilities (trim, urlencode, xml_unescape, safe_filename)
-- Author name parsing
+- Author name parsing, including Citoid-style `mediawiki_authors` normalization
 - XML field extraction
-- Citekey regex patterns
+- Citekey regex patterns, including prefix edge cases (`+`/`-`/`.` characters,
+  missing colons, empty accessions, and accessions that themselves contain
+  colons such as URLs)
+- Crossref-to-CSL type normalization (`normalize_type`)
+- Access-date construction (`today_date_parts`)
+- Cache file path construction (`cache_item_path`, including custom cache
+  directories)
+- Wikidata `P31` (instance-of) to CSL item-type inference
 
 Integration tests render `tests/integration.qmd` and verify that
-the output HTML contains content from each citation type.
+the output HTML contains content from each citation type. A second
+document, `tests/custom-style.qmd`, renders the same kind of typed
+citekeys (`doi:`, `arxiv:`, `url:`) with a non-default numeric CSL style
+(`tests/ieee.csl`, vendored from the
+[CSL styles repository](https://github.com/citation-style-language/styles),
+CC-BY-SA licensed) to confirm pandoc-cite doesn't interfere with citeproc's
+own style handling — citations render as `[1]`-style numeric markers
+instead of author-date text.
 
 ---
 

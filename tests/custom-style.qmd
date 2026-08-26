@@ -1,0 +1,21 @@
+---
+title: "pandoc-cite custom CSL style test"
+format: html
+csl: ieee.csl
+filters:
+  - pandoc-cite
+---
+
+This document exercises a non-default (numeric/Vancouver-style) CSL style —
+IEEE — to verify that pandoc-cite does not interfere with citeproc's normal
+style handling. Unlike `integration.qmd` (which uses the default author-date
+style), citations here should render as bracketed numeric markers like
+`[1]`, `[2]`, `[3]`, not author names.
+
+Nature paper on CRISPR [@doi:10.1038/nature12373].
+
+Transformer architecture paper [@arxiv:1706.03762].
+
+Quarto filters documentation [@url:https://quarto.org/docs/extensions/filters.html].
+
+## References

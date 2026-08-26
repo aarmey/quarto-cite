@@ -103,6 +103,38 @@ if [[ "$INTEGRATION" == "true" ]]; then
   echo "Re-rendering to verify cache hits ..."
   quarto render tests/integration.qmd --output-dir tests/_output 2>&1
 
+  # -------------------------------------------------------------------------
+  # Custom (non-default) CSL style: verify pandoc-cite doesn't interfere
+  # with citeproc's own style handling by rendering with a numeric/IEEE
+  # style and checking for numeric markers instead of author-date text.
+  # -------------------------------------------------------------------------
+  echo "Rendering custom-style.qmd (IEEE numeric CSL) ..."
+  quarto render tests/custom-style.qmd --output-dir tests/_output 2>&1
+
+  CUSTOM_OUTPUT="tests/_output/tests/custom-style.html"
+  if [[ ! -f "$CUSTOM_OUTPUT" ]]; then
+    echo "FAIL: $CUSTOM_OUTPUT not produced" >&2
+    FAILED=1
+  else
+    check_contains_in() {
+      local desc="$1"
+      local pattern="$2"
+      local file="$3"
+      if grep -qi "$pattern" "$file"; then
+        echo "PASS: $desc"
+      else
+        echo "FAIL: $desc — pattern not found: $pattern" >&2
+        FAILED=1
+      fi
+    }
+    check_contains_in "Custom style: DOI citation rendered"   "Kucsko" "$CUSTOM_OUTPUT"
+    check_contains_in "Custom style: arXiv citation rendered" "Vaswani" "$CUSTOM_OUTPUT"
+    check_contains_in "Custom style: URL citation rendered"   "quarto.org" "$CUSTOM_OUTPUT"
+    # IEEE is a numeric in-text style, so citation markers should look like
+    # "[1]" rather than the "(Author, Year)" style used by integration.qmd.
+    check_contains_in "Custom style: numeric citation marker present" "\[1\]" "$CUSTOM_OUTPUT"
+  fi
+
   if [[ $FAILED -ne 0 ]]; then
     echo "" >&2
     echo "One or more integration tests FAILED." >&2
