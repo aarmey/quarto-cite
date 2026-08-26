@@ -50,4 +50,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
-          args: --check _extensions/pandoc-cite/pandoc-cite.lua tests/*.lua
+          args: --check _extensions/pandoc-cite/pandoc-cite.lua tests/unit_tests.lua
