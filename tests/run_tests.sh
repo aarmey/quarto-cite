@@ -137,6 +137,46 @@ if [[ "$INTEGRATION" == "true" ]]; then
     check_contains_in "Custom style: numeric citation marker present" "\[1\]" "$CUSTOM_OUTPUT"
   fi
 
+  # -------------------------------------------------------------------------
+  # Mixed bibliography: verify combining fetched citations with a local
+  # .bib file renders each reference exactly once (no duplicate bibliography).
+  # -------------------------------------------------------------------------
+  echo "Rendering mixed-bibliography.qmd (local .bib + fetched citation) ..."
+  quarto render tests/mixed-bibliography.qmd --output-dir tests/_output 2>&1
+
+  MIXED_OUTPUT="tests/_output/tests/mixed-bibliography.html"
+  if [[ ! -f "$MIXED_OUTPUT" ]]; then
+    echo "FAIL: $MIXED_OUTPUT not produced" >&2
+    FAILED=1
+  else
+    check_contains_in "Mixed bibliography: DOI citation rendered" "Kucsko" "$MIXED_OUTPUT"
+    check_contains_in "Mixed bibliography: local citation rendered" "TestAuthor" "$MIXED_OUTPUT"
+
+    REFS_COUNT=$(grep -c 'id="refs"' "$MIXED_OUTPUT" || true)
+    if [[ "$REFS_COUNT" -eq 1 ]]; then
+      echo "PASS: Mixed bibliography: exactly one #refs container"
+    else
+      echo "FAIL: Mixed bibliography: expected 1 #refs container, found $REFS_COUNT" >&2
+      FAILED=1
+    fi
+
+    DOI_COUNT=$(grep -c 'id="ref-doi:10.1038/nature12373"' "$MIXED_OUTPUT" || true)
+    if [[ "$DOI_COUNT" -eq 1 ]]; then
+      echo "PASS: Mixed bibliography: DOI entry appears exactly once"
+    else
+      echo "FAIL: Mixed bibliography: expected DOI entry once, found $DOI_COUNT" >&2
+      FAILED=1
+    fi
+
+    LOCAL_COUNT=$(grep -c 'id="ref-localSampleKey"' "$MIXED_OUTPUT" || true)
+    if [[ "$LOCAL_COUNT" -eq 1 ]]; then
+      echo "PASS: Mixed bibliography: local entry appears exactly once"
+    else
+      echo "FAIL: Mixed bibliography: expected local entry once, found $LOCAL_COUNT" >&2
+      FAILED=1
+    fi
+  fi
+
   if [[ $FAILED -ne 0 ]]; then
     echo "" >&2
     echo "One or more integration tests FAILED." >&2

@@ -74,7 +74,7 @@ purpose:
 This split is intentional and won't be changed. The filter itself has no
 Quarto-specific dependencies — it's written against standard Pandoc Lua
 filter APIs (`pandoc.pipe`, `pandoc.system`, `pandoc.path`, `pandoc.json`,
-`pandoc.utils.citeproc`, `pandoc.read`) and works with plain Pandoc, not
+`pandoc.read`) and works with plain Pandoc, not
 just Quarto. For example:
 
 ```bash

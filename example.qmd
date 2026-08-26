@@ -1,6 +1,7 @@
 ---
 title: "pandoc-cite example"
 format: html
+citeproc: true
 filters:
   - pandoc-cite
 ---

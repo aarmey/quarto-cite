@@ -1,6 +1,7 @@
 ---
 title: "pandoc-cite integration test"
 format: html
+citeproc: true
 filters:
   - pandoc-cite
 ---
