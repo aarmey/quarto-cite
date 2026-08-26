@@ -11,6 +11,13 @@ functionality of [manubot-cite](https://github.com/manubot/manubot),
 written entirely in Lua so it runs natively inside Pandoc's filter
 pipeline with no additional runtime dependencies.
 
+**Extension vs. Pandoc:** `pandoc-cite` (the filter) has no Quarto-specific
+dependencies — it's built on standard Pandoc Lua filter APIs, so it works
+with any Pandoc >= 3.1 setup, e.g.
+`pandoc --lua-filter=_extensions/pandoc-cite/pandoc-cite.lua --citeproc doc.md`.
+`quarto-cite` (this repo) is simply the recommended, documented distribution
+channel via `quarto add`.
+
 ---
 
 ## Features

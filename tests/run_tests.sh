@@ -11,6 +11,25 @@ cd "$(dirname "$0")/.."
 INTEGRATION=false
 for arg in "$@"; do
   if [[ "$arg" == "--integration" ]]; then INTEGRATION=true; fi
+  if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
+    cat <<'EOF'
+Usage: bash tests/run_tests.sh [--integration]
+
+Runs the pandoc-cite test suite.
+
+  (no flags)      Run unit tests only.
+                   - Pure Lua tests, no internet or network access needed.
+                   - Requires: Quarto (for its bundled `pandoc lua` runner).
+
+  --integration    Also run integration tests, in addition to unit tests.
+                   - Renders tests/integration.qmd and checks the output
+                     for real resolved citations.
+                   - Requires: Quarto, curl, and internet access.
+
+  -h, --help       Show this help message and exit.
+EOF
+    exit 0
+  fi
 done
 
 # ---------------------------------------------------------------------------
