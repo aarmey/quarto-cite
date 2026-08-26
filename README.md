@@ -124,6 +124,27 @@ Wikidata entity [@wikidata:Q42].
 Bare HTTPS URL [@https://quarto.org].
 ```
 
+### Citekey inference (bare DOIs and arXiv IDs)
+
+A small number of identifier shapes are unambiguous enough that the
+`doi:`/`arxiv:` prefix can be inferred automatically, even without it being
+written explicitly:
+
+```markdown
+Bare DOI [@10.1038/nature12373].
+
+Bare arXiv ID [@1706.03762].
+```
+
+This is conservative by design: only identifiers with an unmistakable shape
+(a bare DOI starting with `10.<digits>/…`, or a new-style arXiv id shaped
+like `YYMM.NNNNN[vN]`) are inferred. Anything else — including plain
+numbers that could be a PMID, an ISBN, or a year — is left untouched and
+falls through to normal citeproc/bibliography handling, so ordinary
+hand-written citekeys like `smith2023` are never misinterpreted. Bare
+`http://`/`https://` URLs are already handled without any inference step,
+since the citekey's own colon is parsed as the `http`/`https` prefix.
+
 ### Reference list
 
 Add a `## References` section (or `# References`) at the end of your
@@ -331,6 +352,7 @@ Unit tests run via `pandoc lua tests/unit_tests.lua` and cover:
 - Citekey regex patterns, including prefix edge cases (`+`/`-`/`.` characters,
   missing colons, empty accessions, and accessions that themselves contain
   colons such as URLs)
+- Bare-identifier citekey inference (`infer_prefix`)
 - Crossref-to-CSL type normalization (`normalize_type`)
 - Access-date construction (`today_date_parts`)
 - Cache file path construction (`cache_item_path`, including custom cache
@@ -359,7 +381,7 @@ instead of author-date text.
 | Unpaywall integration     | Yes                        | No                            |
 | Short DOI support         | Yes                        | Handled by doi.org redirect   |
 | Citation pruning          | Yes (`--prune-csl`)        | No                            |
-| Citekey inference         | Yes                        | No (explicit prefix required) |
+| Citekey inference         | Yes (broad)                | Partial (bare DOI + bare arXiv id only; no bare PMID/ISBN inference) |
 | Wikidata                  | Yes                        | Yes                           |
 
 ---

@@ -69,6 +69,18 @@ local function parse_name(name)
   return { literal = name }
 end
 
+local function infer_prefix(id)
+  if type(id) ~= "string" or id == "" then return nil end
+
+  -- Bare DOI: 10.<digits>/<non-whitespace suffix>
+  if id:match("^10%.%d+/%S+$") then return "doi", id end
+
+  -- Bare arXiv new-style ID: YYMM.NNNNN or YYMM.NNNNNN, optional vN suffix
+  if id:match("^%d%d%d%d%.%d%d%d%d%d?v?%d*$") then return "arxiv", id end
+
+  return nil
+end
+
 local function xml_extract(xml, tag)
   local patterns = {
     "<" .. tag .. "[^>]*>(.-)</" .. tag .. ">",
@@ -458,6 +470,61 @@ ok("wikidata type for Q13442814 (sch. article)", eq(wikidata_csl_type(13442814),
 ok("wikidata type for Q191067 (article)", eq(wikidata_csl_type(191067), "article-journal"))
 ok("wikidata type falls back to entry for unknown id", eq(wikidata_csl_type(42), "entry"))
 ok("wikidata type falls back to entry for nil id", eq(wikidata_csl_type(nil), "entry"))
+
+-- ---------------------------------------------------------------------------
+-- Tests: infer_prefix
+-- ---------------------------------------------------------------------------
+
+-- True positives: bare DOI
+local ip, ia = infer_prefix("10.1038/nature12373")
+ok("infer_prefix bare DOI prefix", eq(ip, "doi"))
+ok("infer_prefix bare DOI accession", eq(ia, "10.1038/nature12373"))
+
+ip, ia = infer_prefix("10.1234/some.suffix-with_chars(1)")
+ok(
+  "infer_prefix bare DOI with punctuation suffix",
+  eq(ip, "doi") and eq(ia, "10.1234/some.suffix-with_chars(1)")
+)
+
+ip, ia = infer_prefix("10.48550/arXiv.1706.03762")
+ok(
+  "infer_prefix bare DOI arXiv-style suffix",
+  eq(ip, "doi") and eq(ia, "10.48550/arXiv.1706.03762")
+)
+
+-- True positives: bare arXiv id
+ip, ia = infer_prefix("1706.03762")
+ok("infer_prefix bare arXiv id prefix", eq(ip, "arxiv"))
+ok("infer_prefix bare arXiv id accession", eq(ia, "1706.03762"))
+
+ip, ia = infer_prefix("1706.03762v2")
+ok("infer_prefix bare arXiv id with version", eq(ip, "arxiv") and eq(ia, "1706.03762v2"))
+
+ip, ia = infer_prefix("2301.123456")
+ok("infer_prefix bare arXiv id 6-digit suffix", eq(ip, "arxiv"))
+
+-- True negatives: ordinary citekeys must not be misidentified
+ip = infer_prefix("smith2023")
+ok("infer_prefix ignores ordinary citekey", ip == nil)
+
+ip = infer_prefix("Author2020Title")
+ok("infer_prefix ignores mixed-case citekey", ip == nil)
+
+ip = infer_prefix("2023")
+ok("infer_prefix ignores plain year", ip == nil)
+
+ip = infer_prefix("9780226458113")
+ok("infer_prefix ignores bare 13-digit ISBN-looking number", ip == nil)
+
+ip = infer_prefix("25015390")
+ok("infer_prefix ignores bare PMID-looking number", ip == nil)
+
+ip = infer_prefix("hep-th/9901001")
+ok("infer_prefix ignores old-style arXiv id", ip == nil)
+
+-- Edge cases
+ok("infer_prefix empty string", infer_prefix("") == nil)
+ok("infer_prefix nil input", infer_prefix(nil) == nil)
 
 -- ---------------------------------------------------------------------------
 -- Summary

@@ -83,6 +83,7 @@ if [[ "$INTEGRATION" == "true" ]]; then
 
   FAILED=0
   check_contains "DOI citation rendered"      "Kucsko"
+  check_contains "Bare DOI citation rendered (inference)" "Kucsko"
   check_contains "arXiv citation rendered"    "Vaswani"
   check_contains "PubMed citation rendered"   "Cöster\|C.ster"
   check_contains "PMCID citation rendered"    "Bowling"

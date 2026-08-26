@@ -92,6 +92,47 @@ local function should_retry(attempt, max_retries)
 end
 
 -- ---------------------------------------------------------------------------
+-- Citekey inference
+--
+-- Bare identifiers (no `prefix:` at all) can sometimes be unambiguously
+-- classified from their shape alone, mirroring a small subset of
+-- manubot-cite's citekey inference. This is intentionally conservative:
+-- it must never misfire on an ordinary hand-written citeproc key (e.g.
+-- `smith2023`) since this filter is designed to coexist with a
+-- hand-written .bib bibliography (see README, "Combining with a
+-- hand-written bibliography").
+--
+-- Supported:
+--   * Bare DOI:   10.<registrant>/<suffix>            -> prefix "doi"
+--   * Bare arXiv: YYMM.NNNNN[vN] (new-style, 2007+)   -> prefix "arxiv"
+--
+-- Intentionally NOT supported (too ambiguous without more context):
+--   * Bare PMIDs / ISBNs / other plain digit runs — a bare number could
+--     be a PMID, an ISBN-10/13 digit run, a plain year, or an ordinary
+--     citekey. manubot itself requires additional context to disambiguate
+--     these, so we don't attempt it here.
+--   * Old-style arXiv IDs (e.g. "hep-th/9901001") — these look enough
+--     like a "prefix/accession" citekey that mistakenly matching them
+--     carries meaningful collision risk; use the explicit `arxiv:` prefix.
+--   * Bare http(s):// URLs — these are already handled: the existing
+--     `^([a-z][a-z%+%-%.]*):(.*)` regex in the Cite walker matches
+--     "https" or "http" as the prefix directly (both are already in
+--     SUPPORTED_PREFIXES), so no inference step is needed for URLs.
+-- ---------------------------------------------------------------------------
+
+local function infer_prefix(id)
+  if type(id) ~= "string" or id == "" then return nil end
+
+  -- Bare DOI: 10.<digits>/<non-whitespace suffix>
+  if id:match("^10%.%d+/%S+$") then return "doi", id end
+
+  -- Bare arXiv new-style ID: YYMM.NNNNN or YYMM.NNNNNN, optional vN suffix
+  if id:match("^%d%d%d%d%.%d%d%d%d%d?v?%d*$") then return "arxiv", id end
+
+  return nil
+end
+
+-- ---------------------------------------------------------------------------
 -- HTTP
 -- ---------------------------------------------------------------------------
 
@@ -637,6 +678,11 @@ function Pandoc(doc)
         local id = citation.id
         if not seen[id] then
           local prefix, accession = id:match("^([a-z][a-z%+%-%.]*):(.*)")
+          if not prefix then
+            -- No explicit `prefix:` found; try to confidently infer one
+            -- from the bare identifier's shape (bare DOI / bare arXiv id).
+            prefix, accession = infer_prefix(id)
+          end
           if prefix and SUPPORTED_PREFIXES[prefix] then
             seen[id] = true
             citekeys[#citekeys + 1] = { id = id, prefix = prefix, accession = accession }
