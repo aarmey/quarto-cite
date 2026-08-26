@@ -90,6 +90,7 @@ if [[ "$INTEGRATION" == "true" ]]; then
   check_contains "ISBN citation rendered"     "Scientific Revolutions"
   check_contains "URL citation rendered"      "quarto.org"
   check_contains "Wikidata citation rendered" "wikidata"
+  check_contains "CURIE citation rendered"    "Aspirin\|pubchem"
 
   # Verify cache was populated (Quarto renders from the document dir, so
   # the cache lands next to the source document)

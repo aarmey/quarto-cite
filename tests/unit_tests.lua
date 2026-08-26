@@ -242,7 +242,7 @@ p, a = parse_citekey("wikidata:Q42")
 ok("citekey wikidata prefix", eq(p, "wikidata"))
 ok("citekey wikidata accession", eq(a, "Q42"))
 
--- Keys without a supported prefix return nil
+-- Keys without a prefix (no colon) return nil
 p, a = parse_citekey("smith2023")
 ok("citekey no prefix", p == nil and a == nil)
 
@@ -525,6 +525,40 @@ ok("infer_prefix ignores old-style arXiv id", ip == nil)
 -- Edge cases
 ok("infer_prefix empty string", infer_prefix("") == nil)
 ok("infer_prefix nil input", infer_prefix(nil) == nil)
+
+-- ---------------------------------------------------------------------------
+-- Tests: citekey regex accepts CURIE-style prefixes not in the hardcoded
+-- dispatcher (these fall through to the generic identifiers.org resolver;
+-- see fetch_curie in pandoc-cite.lua). The regex itself doesn't know or
+-- care about SUPPORTED_PREFIXES — any lowercase-led prefix matches.
+-- ---------------------------------------------------------------------------
+p, a = parse_citekey("uniprot:P12345")
+ok("citekey uniprot prefix", eq(p, "uniprot"))
+ok("citekey uniprot accession", eq(a, "P12345"))
+
+p, a = parse_citekey("chebi:15377")
+ok("citekey chebi prefix", eq(p, "chebi"))
+ok("citekey chebi accession", eq(a, "15377"))
+
+p, a = parse_citekey("pubchem.compound:2244")
+ok("citekey dotted CURIE prefix", eq(p, "pubchem.compound"))
+ok("citekey dotted CURIE accession", eq(a, "2244"))
+
+p, a = parse_citekey("ncbi-gene:7157")
+ok("citekey hyphenated CURIE prefix", eq(p, "ncbi-gene"))
+
+-- Malformed keys are still rejected by the regex.
+p, a = parse_citekey("DOI:10.1234/test")
+ok("citekey uppercase prefix rejected", p == nil and a == nil)
+
+p, a = parse_citekey("nocolonhere")
+ok("citekey missing colon rejected", p == nil and a == nil)
+
+p, a = parse_citekey("1notaletter:x")
+ok("citekey prefix must start with a letter", p == nil and a == nil)
+
+p, a = parse_citekey(":noprefix")
+ok("citekey empty prefix rejected", p == nil and a == nil)
 
 -- ---------------------------------------------------------------------------
 -- Summary

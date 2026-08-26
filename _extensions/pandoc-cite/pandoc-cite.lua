@@ -5,6 +5,10 @@
 -- caching results locally, and injecting them into the document bibliography
 -- so Pandoc's built-in citeproc can render them.
 --
+-- Any other syntactically valid prefix (e.g. `uniprot:`, `chebi:`, `pdb:`)
+-- is treated as a generic CURIE and resolved as a fallback via the
+-- identifiers.org resolution service (see fetch_curie below).
+--
 -- Requires: Pandoc >= 3.1, curl on PATH, internet access for uncached keys.
 
 local system = require("pandoc.system")
@@ -25,17 +29,12 @@ local DEFAULT_HTTP_RETRIES = 2
 local HTTP_TIMEOUT = DEFAULT_HTTP_TIMEOUT -- may be updated from meta
 local HTTP_RETRIES = DEFAULT_HTTP_RETRIES -- may be updated from meta
 
-local SUPPORTED_PREFIXES = {
-  doi = true,
-  arxiv = true,
-  pmid = true,
-  pmcid = true,
-  isbn = true,
-  url = true,
-  wikidata = true,
-  http = true, -- bare http://… citekeys
-  https = true, -- bare https://… citekeys
-}
+-- Prefixes with a dedicated, high-quality handler in fetch_citekey below:
+-- doi, arxiv, pmid, pmcid, isbn, url, wikidata, and bare http(s) citekeys.
+-- Any other syntactically valid prefix falls through to the generic CURIE
+-- resolver (fetch_curie), which is lower quality (generic URL/Citoid
+-- resolution rather than a database-specific API). See the `Cite` walker
+-- in `Pandoc(doc)` for where prefixes are accepted.
 
 -- ---------------------------------------------------------------------------
 -- Utilities
@@ -556,6 +555,48 @@ local function fetch_wikidata(qid)
 end
 
 -- ---------------------------------------------------------------------------
+-- Generic CURIE handler (fallback for any prefix without a dedicated
+-- handler above).
+--
+-- identifiers.org (https://identifiers.org) maintains a registry of ~700
+-- biological/scientific database prefixes and resolves `prefix:accession`
+-- CURIEs to the canonical resource page via an HTTP redirect. We resolve
+-- the CURIE to its canonical URL, then reuse the existing `fetch_url`
+-- pipeline (Wikipedia Citoid, falling back to a minimal webpage entry) to
+-- produce a CSL entry.
+--
+-- This is intentionally lower-quality than the dedicated handlers above:
+-- it depends on (a) identifiers.org recognising the prefix/accession, and
+-- (b) the resolved target page being scrapeable by Citoid. If identifiers.org
+-- does not recognise the CURIE (no redirect / non-200), we return nil so the
+-- citation is reported unresolved, matching the behaviour of any other
+-- failed fetch.
+-- ---------------------------------------------------------------------------
+
+local function fetch_curie(prefix, accession)
+  local ident_url = "https://identifiers.org/" .. prefix .. ":" .. accession
+  local args = {
+    "-sS",
+    "-L",
+    "--max-time",
+    "20",
+    "-o",
+    "/dev/null",
+    "-w",
+    "%{http_code} %{url_effective}",
+    "--",
+    ident_url,
+  }
+  local ok, result = pcall(pandoc.pipe, "curl", args, "")
+  if not ok or not result or result == "" then return nil end
+
+  local code, resolved_url = result:match("^(%d+)%s+(.+)$")
+  if not code or code ~= "200" or not resolved_url or resolved_url == "" then return nil end
+
+  return fetch_url(trim(resolved_url))
+end
+
+-- ---------------------------------------------------------------------------
 -- Dispatcher
 -- ---------------------------------------------------------------------------
 
@@ -580,6 +621,10 @@ local function fetch_citekey(prefix, accession)
     item = fetch_url(prefix .. ":" .. accession)
   elseif prefix == "wikidata" then
     item = fetch_wikidata(accession)
+  else
+    -- Unknown prefix: fall back to generic CURIE resolution via
+    -- identifiers.org.
+    item = fetch_curie(prefix, accession)
   end
 
   if item then cache_write(prefix, accession, item) end
@@ -677,13 +722,16 @@ function Pandoc(doc)
       for _, citation in ipairs(el.citations) do
         local id = citation.id
         if not seen[id] then
+          -- Accept any syntactically valid prefix. Known prefixes get a
+          -- dedicated high-quality handler in fetch_citekey; anything else
+          -- falls through to the generic CURIE resolver (identifiers.org).
           local prefix, accession = id:match("^([a-z][a-z%+%-%.]*):(.*)")
           if not prefix then
             -- No explicit `prefix:` found; try to confidently infer one
             -- from the bare identifier's shape (bare DOI / bare arXiv id).
             prefix, accession = infer_prefix(id)
           end
-          if prefix and SUPPORTED_PREFIXES[prefix] then
+          if prefix then
             seen[id] = true
             citekeys[#citekeys + 1] = { id = id, prefix = prefix, accession = accession }
           end

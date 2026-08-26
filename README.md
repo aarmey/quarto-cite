@@ -3,8 +3,9 @@
 ![Test](https://github.com/aarmey/quarto-cite/actions/workflows/test.yml/badge.svg)
 
 A Quarto/Pandoc Lua filter that resolves typed citation keys—such as DOIs,
-arXiv IDs, PubMed IDs, ISBNs, and URLs—to full bibliographic entries
-automatically, without requiring any Python or external tools beyond `curl`.
+arXiv IDs, PubMed IDs, ISBNs, URLs, and generic CURIEs (biological/scientific
+database identifiers)—to full bibliographic entries automatically, without
+requiring any Python or external tools beyond `curl`.
 
 This is a standalone reimplementation of the core citation-resolution
 functionality of [manubot-cite](https://github.com/manubot/manubot),
@@ -32,7 +33,15 @@ channel via `quarto add`.
 | `url:`             | Wikipedia Citoid → minimal fallback                          | `url:https://quarto.org`  |
 | `wikidata:`        | [Wikidata](https://www.wikidata.org) Entity Data API         | `wikidata:Q42`            |
 | `http:` / `https:` | URL (bare, treated as `url:`)                                | `https://quarto.org`      |
+| _any other prefix_ | Generic CURIE via [identifiers.org](https://identifiers.org) | `pubchem.compound:2244`   |
 
+- **Generic CURIE support** — any citekey prefix that isn't one of the
+  dedicated handlers above (e.g. `uniprot:`, `chebi:`, `pdb:`, `ncbigene:`,
+  `pubchem.compound:`) is resolved as a CURIE via the
+  [identifiers.org](https://identifiers.org) resolution registry, which
+  covers 700+ biological/scientific databases. See
+  [CURIE prefixes](#curie-prefixes-generic) below for details and caveats —
+  metadata quality is generally lower than the dedicated handlers.
 - **Local cache** — each resolved citation is stored in `.citation-cache/`
   as a JSON file. Subsequent renders skip network requests entirely.
 - **Full citeproc integration** — resolved citations are injected into
@@ -122,6 +131,10 @@ Web page [@url:https://quarto.org/docs/extensions/filters.html].
 Wikidata entity [@wikidata:Q42].
 
 Bare HTTPS URL [@https://quarto.org].
+
+CURIE identifier (generic, via identifiers.org) [@pubchem.compound:2244].
+
+Another CURIE example [@uniprot:P12345].
 ```
 
 ### Citekey inference (bare DOIs and arXiv IDs)
@@ -309,6 +322,59 @@ https://www.wikidata.org/wiki/Special:EntityData/{QID}.json
 Extracts the English label as the title and inspects the `instance of`
 (P31) claim to assign an appropriate CSL item type.
 
+### CURIE prefixes (generic)
+
+Any prefix that is syntactically valid (lowercase letters, digits, `.`, `-`)
+but doesn't have one of the dedicated handlers above falls through to a
+generic CURIE resolver:
+
+1. The `prefix:accession` pair is resolved via the
+   [identifiers.org](https://identifiers.org) resolution service:
+   `https://identifiers.org/{prefix}:{accession}`. If the registry
+   recognizes the prefix and accession, this redirects (HTTP 302, followed
+   with `curl -L`) to the canonical resource page for that identifier.
+2. The resolved URL is then run through the same pipeline as `url:`
+   citekeys (Wikipedia Citoid, falling back to a minimal
+   `{type: webpage, URL, accessed}` entry).
+
+If identifiers.org doesn't recognize the prefix/accession (no redirect, or
+an error response), the citekey is reported unresolved — the same as any
+other failed fetch.
+
+```markdown
+Aspirin via PubChem CID [@pubchem.compound:2244].
+NCBI Gene entry [@ncbigene:7157].
+UniProt protein entry [@uniprot:P12345].
+```
+
+**Caveats:**
+
+- **Metadata quality is generic, not database-specific.** Unlike the
+  dedicated handlers (which call a database's own API and get structured
+  fields like authors, journal, publication date), CURIE resolution only
+  gets whatever Citoid can scrape from the resolved page's HTML — often
+  just a title and URL. Compare a `doi:` or `pmid:` reference (full author
+  list, journal, year) against a generic CURIE reference (usually just a
+  page title and access date).
+- **Coverage depends on identifiers.org's registry**, not a fixed list of
+  700+ prefixes hand-implemented in this project (that's what manubot-cite
+  does — see [Differences from manubot-cite](#differences-from-manubot-cite)
+  below). If identifiers.org doesn't know a prefix, resolution fails and
+  the citation goes unresolved.
+- **Prefixes must be lowercase.** Citekey syntax requires the prefix to
+  start with a lowercase letter (`^[a-z][a-z%+%-%.]*:`), matching every
+  other prefix this filter supports. identifiers.org's registry is
+  case-sensitive for some namespaces and registers a few canonical
+  prefixes in uppercase or mixed case (e.g. ChEBI is registered as
+  `CHEBI`, not `chebi`) — those specific prefixes are not reachable
+  through this filter's citekey syntax, even though identifiers.org
+  itself supports them.
+- **Some resolved targets aren't good citation targets.** identifiers.org
+  sometimes resolves a CURIE to a machine-oriented endpoint (e.g. a SPARQL
+  query URL) rather than a human-readable page, which Citoid can't
+  usefully scrape — you'll still get a valid (if sparse) `webpage` CSL
+  entry pointing at that URL, but with essentially no metadata beyond it.
+
 ---
 
 ## Troubleshooting
@@ -376,7 +442,7 @@ instead of author-date text.
 | Feature                   | manubot-cite               | pandoc-cite                   |
 | ------------------------- | -------------------------- | ----------------------------- |
 | Runtime                   | Python                     | Pure Lua + curl               |
-| CURIE prefixes            | 700+ biological DBs        | Not supported                 |
+| CURIE prefixes            | 700+ biological DBs, dedicated per-DB resolvers, database-quality metadata | Generic fallback via [identifiers.org](https://identifiers.org)'s registry, resolved through Citoid — lower metadata quality (see [CURIE prefixes](#curie-prefixes-generic)) |
 | Zotero translation server | Yes (primary for URL/ISBN) | No (uses Citoid)              |
 | Unpaywall integration     | Yes                        | No                            |
 | Short DOI support         | Yes                        | Handled by doi.org redirect   |
