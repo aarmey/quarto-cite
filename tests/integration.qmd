@@ -11,6 +11,11 @@ This document exercises every supported citation prefix.
 
 Nature paper on CRISPR [@doi:10.1038/nature12373].
 
+## Bare DOI (citekey inference)
+
+Same Nature paper cited without an explicit `doi:` prefix, relying on
+citekey inference [@10.1038/nature12373].
+
 ## arXiv
 
 Transformer architecture paper [@arxiv:1706.03762].
