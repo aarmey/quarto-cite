@@ -18,6 +18,13 @@ local DEFAULT_CACHE_DIR = ".citation-cache"
 local CACHE_DIR = DEFAULT_CACHE_DIR -- may be updated from meta
 local BIB_FILENAME = "pandoc-cite-bibliography.json"
 
+-- Per-attempt curl timeout (seconds) and number of retries after the first
+-- attempt. Both may be overridden via document metadata (see Pandoc(doc)).
+local DEFAULT_HTTP_TIMEOUT = 30
+local DEFAULT_HTTP_RETRIES = 2
+local HTTP_TIMEOUT = DEFAULT_HTTP_TIMEOUT -- may be updated from meta
+local HTTP_RETRIES = DEFAULT_HTTP_RETRIES -- may be updated from meta
+
 local SUPPORTED_PREFIXES = {
   doi = true,
   arxiv = true,
@@ -59,13 +66,49 @@ local function safe_filename(s)
   return tostring(s):gsub("[^%w%.%-]", "_"):sub(1, 180)
 end
 
+-- Parse a positive integer out of a metadata value (already stringified, or
+-- nil). Falls back to `default` if the value is nil, empty, not a valid
+-- integer, or not positive (retries of 0 are allowed; timeouts of 0 are not
+-- useful and also fall back). Pure function, no I/O — kept separate from
+-- metadata plumbing so it can be unit tested directly.
+local function parse_positive_int(value, default, allow_zero)
+  if value == nil then return default end
+  local s = trim(tostring(value))
+  if s == "" then return default end
+  local n = tonumber(s)
+  if not n then return default end
+  n = math.floor(n)
+  if n < 0 then return default end
+  if n == 0 and not allow_zero then return default end
+  return n
+end
+
+-- Given the attempt number that just failed (1-based) and the configured
+-- number of retries (attempts allowed *after* the first try), decide
+-- whether another attempt should be made. Pure function so it can be unit
+-- tested without mocking pandoc.pipe.
+local function should_retry(attempt, max_retries)
+  return attempt <= max_retries
+end
+
 -- ---------------------------------------------------------------------------
 -- HTTP
 -- ---------------------------------------------------------------------------
 
 -- Run curl and return the response body, or nil on error.
+--
+-- Retries only cover curl/pcall-level failures (network errors, connection
+-- resets, timeouts) — i.e. cases where curl exits non-zero and pandoc.pipe
+-- raises. The current invocation does not pass `--fail`, so curl exits 0 on
+-- HTTP error responses (e.g. 404) and returns the error body as `result`;
+-- those are treated as "not found" by the downstream JSON/type checks in
+-- each fetch_* function and are correctly NOT retried here, since retrying
+-- a 404 would just waste time. There is no artificial sleep between
+-- retries: curl's own `--max-time` already bounds each attempt, and a
+-- Pandoc filter runs synchronously, so keeping retries immediate avoids
+-- adding extra wall-clock delay on top of already-slow networks.
 local function http_get(url, headers)
-  local args = { "-sS", "-L", "--max-time", "30" }
+  local args = { "-sS", "-L", "--max-time", tostring(HTTP_TIMEOUT) }
   if headers then
     for k, v in pairs(headers) do
       args[#args + 1] = "-H"
@@ -74,9 +117,14 @@ local function http_get(url, headers)
   end
   args[#args + 1] = "--"
   args[#args + 1] = url
-  local ok, result = pcall(pandoc.pipe, "curl", args, "")
-  if ok and result and result ~= "" then return result end
-  return nil
+
+  local attempt = 0
+  while true do
+    attempt = attempt + 1
+    local ok, result = pcall(pandoc.pipe, "curl", args, "")
+    if ok and result and result ~= "" then return result end
+    if not should_retry(attempt, HTTP_RETRIES) then return nil end
+  end
 end
 
 -- ---------------------------------------------------------------------------
@@ -564,6 +612,19 @@ function Pandoc(doc)
   if meta["citation-cache"] then
     local v = pandoc.utils.stringify(meta["citation-cache"])
     if v and v ~= "" then CACHE_DIR = v end
+  end
+  if meta["citation-http-timeout"] then
+    HTTP_TIMEOUT = parse_positive_int(
+      pandoc.utils.stringify(meta["citation-http-timeout"]),
+      DEFAULT_HTTP_TIMEOUT
+    )
+  end
+  if meta["citation-http-retries"] then
+    HTTP_RETRIES = parse_positive_int(
+      pandoc.utils.stringify(meta["citation-http-retries"]),
+      DEFAULT_HTTP_RETRIES,
+      true
+    )
   end
 
   -- Collect all Cite nodes

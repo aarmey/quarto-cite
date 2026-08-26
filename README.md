@@ -176,6 +176,29 @@ citation-cache: /path/to/my-cache
 ---
 ```
 
+### HTTP timeout and retries
+
+Each upstream fetch is made with `curl`, bounded by a per-attempt timeout,
+and retried automatically on network-level failures (connection errors,
+timeouts, DNS problems). HTTP error responses (e.g. a genuine 404) are not
+retried, since a retry won't change the answer.
+
+Both are configurable via front matter:
+
+```yaml
+---
+citation-http-timeout: 30   # seconds per attempt (default: 30)
+citation-http-retries: 2    # retries after the first attempt (default: 2)
+---
+```
+
+Retries happen immediately with no artificial delay, since each attempt is
+already bounded by `citation-http-timeout` and Pandoc filters run
+synchronously. Increase `citation-http-timeout` on slow links or corporate
+proxies that add latency, and increase `citation-http-retries` on flaky
+networks that intermittently drop connections. Set `citation-http-retries: 0`
+to disable retries entirely.
+
 ---
 
 ## Combining with a hand-written bibliography
@@ -271,7 +294,10 @@ Extracts the English label as the title and inspects the `instance of`
 
 **"could not resolve doi:…"** — `curl` couldn't reach the upstream API.
 Check your network connection or proxy settings. Inspect the error by
-running `curl -v "https://doi.org/..."` manually.
+running `curl -v "https://doi.org/..."` manually. Transient network
+failures (timeouts, connection resets) are retried automatically — see
+[HTTP timeout and retries](#http-timeout-and-retries) — so a warning here
+means every attempt failed.
 
 **No reference list appears** — Make sure `--citeproc` is being used.
 Quarto enables it automatically when citations are present; for plain

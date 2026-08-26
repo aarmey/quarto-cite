@@ -158,6 +158,49 @@ ok("xml_extract ns doi", eq(xml_extract(sample_entry, "doi"), "10.48550/arXiv.17
 ok("xml_extract missing", xml_extract(sample_entry, "summary") == nil)
 
 -- ---------------------------------------------------------------------------
+-- HTTP retry/timeout config helpers (inlined copies, see pandoc-cite.lua)
+-- ---------------------------------------------------------------------------
+
+local function parse_positive_int(value, default, allow_zero)
+  if value == nil then return default end
+  local s = trim(tostring(value))
+  if s == "" then return default end
+  local n = tonumber(s)
+  if not n then return default end
+  n = math.floor(n)
+  if n < 0 then return default end
+  if n == 0 and not allow_zero then return default end
+  return n
+end
+
+local function should_retry(attempt, max_retries)
+  return attempt <= max_retries
+end
+
+-- ---------------------------------------------------------------------------
+-- Tests: parse_positive_int
+-- ---------------------------------------------------------------------------
+ok("parse_positive_int nil uses default", eq(parse_positive_int(nil, 30), 30))
+ok("parse_positive_int empty uses default", eq(parse_positive_int("", 30), 30))
+ok("parse_positive_int valid string", eq(parse_positive_int("45", 30), 45))
+ok("parse_positive_int valid number", eq(parse_positive_int(10, 30), 10))
+ok("parse_positive_int non-numeric fallback", eq(parse_positive_int("abc", 30), 30))
+ok("parse_positive_int truncates floats", eq(parse_positive_int("2.9", 30), 2))
+ok("parse_positive_int negative fallback", eq(parse_positive_int("-5", 30), 30))
+ok("parse_positive_int zero fallback by default", eq(parse_positive_int("0", 30), 30))
+ok("parse_positive_int zero allowed when flagged", eq(parse_positive_int("0", 2, true), 0))
+ok("parse_positive_int whitespace trimmed", eq(parse_positive_int("  7  ", 30), 7))
+
+-- ---------------------------------------------------------------------------
+-- Tests: should_retry
+-- ---------------------------------------------------------------------------
+ok("should_retry retries when under max", should_retry(1, 2) == true)
+ok("should_retry retries on last allowed try", should_retry(2, 2) == true)
+ok("should_retry stops once exhausted", should_retry(3, 2) == false)
+ok("should_retry never retries with 0 max", should_retry(1, 0) == false)
+ok("should_retry always retries with large max", should_retry(1, 100) == true)
+
+-- ---------------------------------------------------------------------------
 -- Tests: citekey regex
 -- ---------------------------------------------------------------------------
 local function parse_citekey(id)
