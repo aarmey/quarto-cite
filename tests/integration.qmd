@@ -40,4 +40,8 @@ Quarto filters documentation [@url:https://quarto.org/docs/extensions/filters.ht
 
 Douglas Adams via Wikidata [@wikidata:Q42].
 
+## CURIE (generic, via identifiers.org)
+
+Aspirin via PubChem CID [@pubchem.compound:2244].
+
 ## References
