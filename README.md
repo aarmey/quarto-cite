@@ -54,7 +54,7 @@ Install directly from GitHub into your project:
 quarto add aarmey/quarto-cite
 ```
 
-This copies the extension into `_extensions/quarto-cite/` alongside your
+This copies the extension into `_extensions/pandoc-cite/` alongside your
 document or project.
 
 ### Manual installation
@@ -178,7 +178,7 @@ bibliography. Both are passed to citeproc:
 ---
 bibliography: references.bib
 filters:
-  - quarto-cite
+  - pandoc-cite
 ---
 ```
 
@@ -190,12 +190,12 @@ are resolved automatically and appended to the bibliography list.
 ## Advanced: filter ordering
 
 By default the filter runs before Quarto's built-in citeproc, which is
-correct. If you have other custom filters, place `quarto-cite` before any
+correct. If you have other custom filters, place `pandoc-cite` before any
 filter that needs the resolved bibliography:
 
 ```yaml
 filters:
-  - quarto-cite
+  - pandoc-cite
   - my-other-filter
 ```
 
