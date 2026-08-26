@@ -1,0 +1,11 @@
+---
+title: "pandoc-cite mixed bibliography test"
+format: html
+bibliography: sample-local.bib
+filters:
+  - pandoc-cite
+---
+
+Testing a fetched citation [@doi:10.1038/nature12373] and a local citation [@localSampleKey].
+
+## References

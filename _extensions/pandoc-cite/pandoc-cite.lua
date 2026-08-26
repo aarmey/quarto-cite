@@ -773,8 +773,5 @@ function Pandoc(doc)
   local refs_meta = build_references_meta(csl_items, meta.references)
   if refs_meta then meta.references = refs_meta end
 
-  -- Run citeproc now so citations are resolved before Quarto's own pass.
-  -- Quarto's citeproc sees already-formatted inline spans and is a no-op.
-  local processed = pandoc.utils.citeproc(pandoc.Pandoc(doc.blocks, meta))
-  return processed
+  return pandoc.Pandoc(doc.blocks, meta)
 end

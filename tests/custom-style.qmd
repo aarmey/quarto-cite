@@ -2,6 +2,7 @@
 title: "pandoc-cite custom CSL style test"
 format: html
 csl: ieee.csl
+citeproc: true
 filters:
   - pandoc-cite
 ---
