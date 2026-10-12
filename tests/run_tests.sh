@@ -177,6 +177,28 @@ if [[ "$INTEGRATION" == "true" ]]; then
     fi
   fi
 
+  # -------------------------------------------------------------------------
+  # Citeproc disabled: verify the filter warns that resolved citations will
+  # not be rendered.
+  # -------------------------------------------------------------------------
+  echo "Rendering no-citeproc.qmd (citeproc not enabled) ..."
+  NO_CITEPROC_LOG=$(quarto render tests/no-citeproc.qmd --output-dir tests/_output 2>&1 || true)
+  if grep -q "citeproc is not enabled" <<<"$NO_CITEPROC_LOG"; then
+    echo "PASS: No citeproc: warning printed"
+  else
+    echo "FAIL: No citeproc: expected warning not printed" >&2
+    FAILED=1
+  fi
+
+  # The other test documents enable citeproc, so they must not warn.
+  CITEPROC_LOG=$(quarto render tests/integration.qmd --output-dir tests/_output 2>&1)
+  if grep -q "citeproc is not enabled" <<<"$CITEPROC_LOG"; then
+    echo "FAIL: Citeproc enabled: unexpected warning printed" >&2
+    FAILED=1
+  else
+    echo "PASS: Citeproc enabled: no warning"
+  fi
+
   if [[ $FAILED -ne 0 ]]; then
     echo "" >&2
     echo "One or more integration tests FAILED." >&2

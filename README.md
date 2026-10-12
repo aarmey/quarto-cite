@@ -99,6 +99,7 @@ Add the filter to your document's YAML front matter:
 ```yaml
 ---
 title: "My Document"
+citeproc: true
 filters:
   - pandoc-cite
 ---
@@ -107,9 +108,15 @@ filters:
 Or to `_quarto.yml` for a whole project:
 
 ```yaml
+citeproc: true
 filters:
   - pandoc-cite
 ```
+
+`citeproc: true` is required: the filter adds the resolved references to the
+document metadata, which only citeproc reads, and Quarto does not enable
+citeproc automatically for documents without a `bibliography`. The filter
+prints a warning when citeproc is not enabled.
 
 ### Cite by identifier
 
@@ -386,9 +393,11 @@ failures (timeouts, connection resets) are retried automatically — see
 [HTTP timeout and retries](#http-timeout-and-retries) — so a warning here
 means every attempt failed.
 
-**No reference list appears** — Make sure `--citeproc` is being used.
-Quarto enables it automatically when citations are present; for plain
-Pandoc add `--citeproc` to your command.
+**No reference list appears, or Typst reports "the document does not
+contain a bibliography"** — Make sure citeproc is enabled. In Quarto, add
+`citeproc: true` to the document's YAML front matter; the filter prints a
+warning when it is missing. For plain Pandoc, add `--citeproc` to your
+command.
 
 **Stale cached data** — Delete the relevant file in `.citation-cache/`
 to force a fresh fetch.
