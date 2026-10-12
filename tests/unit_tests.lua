@@ -561,6 +561,24 @@ p, a = parse_citekey(":noprefix")
 ok("citekey empty prefix rejected", p == nil and a == nil)
 
 -- ---------------------------------------------------------------------------
+-- Tests: citeproc_warning
+-- ---------------------------------------------------------------------------
+local function citeproc_warning(cite_method)
+  if cite_method == "citeproc" then return nil end
+  return "[pandoc-cite] WARNING: citeproc is not enabled (citation method: "
+    .. tostring(cite_method or "none")
+    .. "), so resolved citations will not be rendered. "
+    .. "Add `citeproc: true` to the document's YAML front matter.\n"
+end
+
+ok("citeproc_warning silent when citeproc enabled", citeproc_warning("citeproc") == nil)
+local w = citeproc_warning(nil)
+ok("citeproc_warning warns when no citation method", w ~= nil and w:find("method: none", 1, true) ~= nil)
+ok("citeproc_warning suggests the fix", w ~= nil and w:find("citeproc: true", 1, true) ~= nil)
+w = citeproc_warning("natbib")
+ok("citeproc_warning names other citation methods", w ~= nil and w:find("method: natbib", 1, true) ~= nil)
+
+-- ---------------------------------------------------------------------------
 -- Summary
 -- ---------------------------------------------------------------------------
 print(string.format("\n%d passed, %d failed", PASS, FAIL))

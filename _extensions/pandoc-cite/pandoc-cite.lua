@@ -689,6 +689,24 @@ local function write_bib_cache(csl_items)
 end
 
 -- ---------------------------------------------------------------------------
+-- Citeproc check
+-- ---------------------------------------------------------------------------
+
+-- Resolved references are injected as `references` metadata, which only
+-- citeproc reads. Under Quarto, citeproc must be enabled per document
+-- (`citeproc: true`); the `metadata` in _extension.yml does not enable it.
+-- Without it, citations are left unresolved (or, for Typst, compilation
+-- fails with "the document does not contain a bibliography"). Returns a
+-- warning message when `cite_method` is not "citeproc", otherwise nil.
+local function citeproc_warning(cite_method)
+  if cite_method == "citeproc" then return nil end
+  return "[pandoc-cite] WARNING: citeproc is not enabled (citation method: "
+    .. tostring(cite_method or "none")
+    .. "), so resolved citations will not be rendered. "
+    .. "Add `citeproc: true` to the document's YAML front matter.\n"
+end
+
+-- ---------------------------------------------------------------------------
 -- Main filter
 -- ---------------------------------------------------------------------------
 
@@ -772,6 +790,13 @@ function Pandoc(doc)
   -- as Pandoc's YAML parser would produce them (which citeproc expects).
   local refs_meta = build_references_meta(csl_items, meta.references)
   if refs_meta then meta.references = refs_meta end
+
+  -- Under Quarto, warn if citeproc is off: the injected references would be
+  -- silently ignored. Plain Pandoc exposes no equivalent check to filters.
+  if quarto and quarto.doc and quarto.doc.cite_method then
+    local warning = citeproc_warning(quarto.doc.cite_method())
+    if warning then io.stderr:write(warning) end
+  end
 
   return pandoc.Pandoc(doc.blocks, meta)
 end

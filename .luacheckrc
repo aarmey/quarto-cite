@@ -17,6 +17,8 @@ read_globals = {
   "PANDOC_SCRIPT_FILE",
   "PANDOC_STATE",
   "FORMAT",
+  -- Defined only when running under Quarto; the filter checks for it first.
+  "quarto",
 }
 
 files["_extensions/pandoc-cite/pandoc-cite.lua"] = {
