@@ -103,7 +103,9 @@ if [[ "$INTEGRATION" == "true" ]]; then
 
   # Second render should use cache (no network needed if offline)
   echo "Re-rendering to verify cache hits ..."
-  quarto render tests/integration.qmd --output-dir tests/_output 2>&1
+  # Keep the log: the citeproc check below reuses it instead of rendering again.
+  CITEPROC_LOG=$(quarto render tests/integration.qmd --output-dir tests/_output 2>&1)
+  echo "$CITEPROC_LOG"
 
   # -------------------------------------------------------------------------
   # Custom (non-default) CSL style: verify pandoc-cite doesn't interfere
@@ -190,8 +192,7 @@ if [[ "$INTEGRATION" == "true" ]]; then
     FAILED=1
   fi
 
-  # The other test documents enable citeproc, so they must not warn.
-  CITEPROC_LOG=$(quarto render tests/integration.qmd --output-dir tests/_output 2>&1)
+  # integration.qmd enables citeproc, so its render (logged above) must not warn.
   if grep -q "citeproc is not enabled" <<<"$CITEPROC_LOG"; then
     echo "FAIL: Citeproc enabled: unexpected warning printed" >&2
     FAILED=1

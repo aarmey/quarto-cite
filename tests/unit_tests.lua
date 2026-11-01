@@ -563,13 +563,27 @@ ok("citekey empty prefix rejected", p == nil and a == nil)
 -- ---------------------------------------------------------------------------
 -- Tests: citeproc_warning
 -- ---------------------------------------------------------------------------
-local function citeproc_warning(cite_method)
-  if cite_method == "citeproc" then return nil end
-  return "[pandoc-cite] WARNING: citeproc is not enabled (citation method: "
-    .. tostring(cite_method or "none")
-    .. "), so resolved citations will not be rendered. "
-    .. "Add `citeproc: true` to the document's YAML front matter.\n"
+-- Load the function's definition from the filter source itself, so these tests
+-- exercise the shipped code rather than a copy that could drift from it.
+local FILTER_PATH = path.join({
+  path.directory(arg[0]), -- this script's path under `pandoc lua`
+  "..",
+  "_extensions",
+  "pandoc-cite",
+  "pandoc-cite.lua",
+})
+
+local function load_filter_function(name)
+  local f = assert(io.open(FILTER_PATH, "r"))
+  local src = f:read("*all")
+  f:close()
+  -- A top-level local function runs until the first unindented `end`.
+  local body = src:match("\nlocal function " .. name .. "(%b().-\nend)\n")
+  assert(body, "could not find function " .. name .. " in " .. FILTER_PATH)
+  return assert(load("return function" .. body))()
 end
+
+local citeproc_warning = load_filter_function("citeproc_warning")
 
 ok("citeproc_warning silent when citeproc enabled", citeproc_warning("citeproc") == nil)
 local w = citeproc_warning(nil)
