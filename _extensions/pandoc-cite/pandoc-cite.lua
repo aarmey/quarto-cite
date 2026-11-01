@@ -225,15 +225,32 @@ local function parse_name(name)
   return { literal = name }
 end
 
+-- Citoid's mediawiki format gives each creator as a [given, family] pair,
+-- e.g. [["Thomas S.", "Kuhn"]]. A single-field creator (an organisation)
+-- has an empty given name, e.g. ["", "World Health Organization"], and is
+-- returned as a literal name so it is not split into given/family parts.
+local function citoid_pair_name(a)
+  local given, family = trim(a[1]), trim(a[2])
+  if type(family) ~= "string" or family == "" then
+    if type(given) == "string" and given ~= "" then return parse_name(given) end
+    return nil
+  end
+  if type(given) ~= "string" or given == "" then return { literal = family } end
+  return { family = family, given = given }
+end
+
 local function mediawiki_authors(author_list)
   if type(author_list) ~= "table" then return {} end
   local out = {}
   for _, a in ipairs(author_list) do
     if type(a) == "table" then
-      local entry = {}
-      entry.family = a.last or a.family
-      entry.given = a.first or a.given
-      if not entry.family and a.name then entry = parse_name(a.name) end
+      local entry
+      if a[1] ~= nil or a[2] ~= nil then
+        entry = citoid_pair_name(a)
+      else
+        entry = { family = a.last or a.family, given = a.first or a.given }
+        if not entry.family and a.name then entry = parse_name(a.name) end
+      end
       if entry then out[#out + 1] = entry end
     elseif type(a) == "string" then
       local entry = parse_name(a)
@@ -468,7 +485,36 @@ end
 
 local function today_date_parts()
   local t = os.date("*t")
-  return { { t.year, t.month, t.mday } }
+  return { { t.year, t.month, t.day } }
+end
+
+-- Parse an ISO-style date ("2025-02-06", "2025-02" or "2025") into CSL
+-- date-parts. Returns nil if no four-digit year is found.
+local function iso_date_parts(s)
+  if type(s) ~= "string" then return nil end
+  local y, m, d = s:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)")
+  if y then return { { tonumber(y), tonumber(m), tonumber(d) } } end
+  y, m = s:match("^(%d%d%d%d)%-(%d%d)")
+  if y then return { { tonumber(y), tonumber(m) } } end
+  y = s:match("(%d%d%d%d)")
+  if y then return { { tonumber(y) } } end
+  return nil
+end
+
+-- Map the patent-specific fields of a Citoid (Zotero) record onto CSL.
+-- Zotero stores inventors under `inventor` rather than `author`, and the
+-- publication date under `issueDate` rather than `date`.
+local function apply_citoid_patent_fields(item, d)
+  if #item.author == 0 then item.author = mediawiki_authors(d.inventor) end
+  item.number = d.patentNumber
+  item.authority = d.issuingAuthority
+  item.publisher = d.assignee
+  item.jurisdiction = d.country
+  local issued = iso_date_parts(d.issueDate)
+  if issued then item.issued = { ["date-parts"] = issued } end
+  local submitted = iso_date_parts(d.filingDate)
+  if submitted then item.submitted = { ["date-parts"] = submitted } end
+  return item
 end
 
 local function fetch_url(url_str)
@@ -492,6 +538,7 @@ local function fetch_url(url_str)
           accessed = { ["date-parts"] = today_date_parts() },
         }
         if year then item.issued = { ["date-parts"] = { { tonumber(year) } } } end
+        if d.itemType == "patent" then apply_citoid_patent_fields(item, d) end
         return item
       end
     end
