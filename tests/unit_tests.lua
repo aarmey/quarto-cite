@@ -21,6 +21,39 @@ local function eq(a, b)
 end
 
 -- ---------------------------------------------------------------------------
+-- Load function definitions from the filter source itself, so tests exercise
+-- the shipped code rather than a copy that could drift from it. Functions are
+-- loaded together, in the order given, so later ones can call earlier ones
+-- (list a function's dependencies before it).
+-- ---------------------------------------------------------------------------
+local FILTER_PATH = path.join({
+  path.directory(arg[0]), -- this script's path under `pandoc lua`
+  "..",
+  "_extensions",
+  "pandoc-cite",
+  "pandoc-cite.lua",
+})
+
+local function load_filter_functions(names)
+  local f = assert(io.open(FILTER_PATH, "r"))
+  local src = f:read("*all")
+  f:close()
+  local chunk = {}
+  for _, name in ipairs(names) do
+    -- A top-level local function runs until the first unindented `end`.
+    local body = src:match("\nlocal function " .. name .. "(%b().-\nend)\n")
+    assert(body, "could not find function " .. name .. " in " .. FILTER_PATH)
+    chunk[#chunk + 1] = "local function " .. name .. body
+  end
+  local exports = {}
+  for _, name in ipairs(names) do
+    exports[#exports + 1] = name .. " = " .. name
+  end
+  chunk[#chunk + 1] = "return { " .. table.concat(exports, ", ") .. " }"
+  return assert(load(table.concat(chunk, "\n")))()
+end
+
+-- ---------------------------------------------------------------------------
 -- Load helpers from the filter without running the Pandoc() entry point.
 -- We do this by reading the source and extracting the pure-Lua functions.
 -- ---------------------------------------------------------------------------
@@ -339,32 +372,18 @@ ok(
 )
 
 -- ---------------------------------------------------------------------------
--- Tests: mediawiki_authors
--- (mirrors mediawiki_authors, pandoc-cite.lua lines 143-161; relies on
--- parse_name defined above, which is byte-for-byte the same as the filter's)
+-- Tests: mediawiki_authors and Citoid patent fields (loaded from the filter)
 -- ---------------------------------------------------------------------------
-local function mediawiki_authors(author_list)
-  if type(author_list) ~= "table" then return {} end
-  local out = {}
-  for _, au in ipairs(author_list) do
-    if type(au) == "table" then
-      local entry = {}
-      entry.family = au.last or au.family
-      entry.given = au.first or au.given
-      if not entry.family and au.name then entry = parse_name(au.name) end
-      if entry then out[#out + 1] = entry end
-    elseif type(au) == "string" then
-      local entry = parse_name(au)
-      if entry then out[#out + 1] = entry end
-    end
-  end
-  return out
-end
+local citoid = load_filter_functions({
+  "trim",
+  "parse_name",
+  "citoid_pair_name",
+  "mediawiki_authors",
+  "iso_date_parts",
+  "apply_citoid_patent_fields",
+})
+local mediawiki_authors = citoid.mediawiki_authors
 
--- Citoid commonly returns authors as [["First","Last"], ...] pairs, which
--- decode from JSON as Lua tables with numeric keys, not "first"/"last" keys.
--- The real Citoid "author" shape used by fetch_isbn/fetch_url is a list of
--- {first=, last=} tables (see call sites), so that's what we exercise here.
 local mw1 = mediawiki_authors({
   { first = "Ada", last = "Lovelace" },
   { first = "Alan", last = "Turing" },
@@ -395,21 +414,81 @@ ok("mediawiki_authors nil input", #mediawiki_authors(nil) == 0)
 ok("mediawiki_authors string input", #mediawiki_authors("not a table") == 0)
 ok("mediawiki_authors empty list", #mediawiki_authors({}) == 0)
 
+-- Citoid's actual format: [given, family] pairs (decoded as array tables)
+local mw5 = mediawiki_authors({ { "Thomas S.", "Kuhn" }, { "Lawrence", "Page" } })
+ok("mediawiki_authors Citoid pair count", #mw5 == 2)
+ok(
+  "mediawiki_authors Citoid pair given/family",
+  mw5[1] and eq(mw5[1].given, "Thomas S.") and eq(mw5[1].family, "Kuhn")
+)
+ok("mediawiki_authors Citoid second pair", mw5[2] and eq(mw5[2].family, "Page"))
+
+-- A single-field creator (empty given name) becomes a literal name
+local mw6 = mediawiki_authors({ { "", "World Health Organization" } })
+ok(
+  "mediawiki_authors Citoid organisation literal",
+  mw6[1] and eq(mw6[1].literal, "World Health Organization") and mw6[1].family == nil
+)
+
+-- A pair with only a given part is parsed as a full name
+local mw7 = mediawiki_authors({ { "Grace Hopper", "" } })
+ok("mediawiki_authors Citoid given-only pair", mw7[1] and eq(mw7[1].family, "Hopper"))
+
+-- An empty pair is skipped rather than producing an empty name
+ok("mediawiki_authors Citoid empty pair skipped", #mediawiki_authors({ { "", "" } }) == 0)
+
+-- iso_date_parts
+local iso = citoid.iso_date_parts
+local dp = iso("2001-09-04")
+ok("iso_date_parts full date", dp and dp[1][1] == 2001 and dp[1][2] == 9 and dp[1][3] == 4)
+dp = iso("2001-09")
+ok("iso_date_parts year-month", dp and #dp[1] == 2 and dp[1][2] == 9)
+dp = iso("c. 2001")
+ok("iso_date_parts year only", dp and #dp[1] == 1 and dp[1][1] == 2001)
+ok("iso_date_parts nil input", iso(nil) == nil)
+ok("iso_date_parts no year", iso("unknown") == nil)
+
+-- apply_citoid_patent_fields, using the shape of a real Citoid patent record
+local patent = citoid.apply_citoid_patent_fields({ type = "patent", author = {} }, {
+  itemType = "patent",
+  inventor = { { "Lawrence", "Page" } },
+  issueDate = "2001-09-04",
+  filingDate = "1998-01-09",
+  patentNumber = "US6285999B1",
+  assignee = "Leland Stanford Junior University",
+  issuingAuthority = "United States",
+  country = "US",
+})
+ok("patent inventor becomes author", patent.author[1] and eq(patent.author[1].family, "Page"))
+ok("patent number", eq(patent.number, "US6285999B1"))
+ok("patent assignee as publisher", eq(patent.publisher, "Leland Stanford Junior University"))
+ok("patent authority", eq(patent.authority, "United States"))
+ok("patent jurisdiction", eq(patent.jurisdiction, "US"))
+local issued = patent.issued and patent.issued["date-parts"][1]
+ok("patent issued from issueDate", issued and issued[1] == 2001 and issued[3] == 4)
+local submitted = patent.submitted and patent.submitted["date-parts"][1]
+ok("patent submitted from filingDate", submitted and submitted[1] == 1998)
+
+-- Existing authors are kept rather than replaced by inventors
+local kept = citoid.apply_citoid_patent_fields(
+  { author = { { family = "Existing" } } },
+  { inventor = { { "Lawrence", "Page" } } }
+)
+ok("patent keeps existing authors", eq(kept.author[1].family, "Existing"))
+
 -- ---------------------------------------------------------------------------
 -- Tests: today_date_parts
--- (mirrors today_date_parts, pandoc-cite.lua lines 390-393)
 -- ---------------------------------------------------------------------------
-local function today_date_parts()
-  local t = os.date("*t")
-  return { { t.year, t.month, t.mday } }
-end
+local today_date_parts = load_filter_functions({ "today_date_parts" }).today_date_parts
 
 local tdp = today_date_parts()
 local now = os.date("*t")
 ok("today_date_parts shape is a single triple", type(tdp) == "table" and type(tdp[1]) == "table")
 ok("today_date_parts year matches os.date", eq(tdp[1][1], now.year))
 ok("today_date_parts month matches os.date", eq(tdp[1][2], now.month))
-ok("today_date_parts day matches os.date", eq(tdp[1][3], now.mday))
+ok("today_date_parts has year, month and day", #tdp[1] == 3)
+ok("today_date_parts day is a number", type(tdp[1][3]) == "number")
+ok("today_date_parts day matches os.date", eq(tdp[1][3], now.day))
 
 -- ---------------------------------------------------------------------------
 -- Tests: cache_item_path
@@ -563,27 +642,7 @@ ok("citekey empty prefix rejected", p == nil and a == nil)
 -- ---------------------------------------------------------------------------
 -- Tests: citeproc_warning
 -- ---------------------------------------------------------------------------
--- Load the function's definition from the filter source itself, so these tests
--- exercise the shipped code rather than a copy that could drift from it.
-local FILTER_PATH = path.join({
-  path.directory(arg[0]), -- this script's path under `pandoc lua`
-  "..",
-  "_extensions",
-  "pandoc-cite",
-  "pandoc-cite.lua",
-})
-
-local function load_filter_function(name)
-  local f = assert(io.open(FILTER_PATH, "r"))
-  local src = f:read("*all")
-  f:close()
-  -- A top-level local function runs until the first unindented `end`.
-  local body = src:match("\nlocal function " .. name .. "(%b().-\nend)\n")
-  assert(body, "could not find function " .. name .. " in " .. FILTER_PATH)
-  return assert(load("return function" .. body))()
-end
-
-local citeproc_warning = load_filter_function("citeproc_warning")
+local citeproc_warning = load_filter_functions({ "citeproc_warning" }).citeproc_warning
 
 ok("citeproc_warning silent when citeproc enabled", citeproc_warning("citeproc") == nil)
 local w = citeproc_warning(nil)

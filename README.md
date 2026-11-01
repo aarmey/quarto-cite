@@ -35,6 +35,10 @@ channel via `quarto add`.
 | `http:` / `https:` | URL (bare, treated as `url:`)                                | `https://quarto.org`      |
 | _any other prefix_ | Generic CURIE via [identifiers.org](https://identifiers.org) | `pubchem.compound:2244`   |
 
+- **Patents** — cite a [Google Patents](https://patents.google.com) page
+  with `url:`, e.g. `url:https://patents.google.com/patent/US6285999B1/en`.
+  The inventors, patent number, issuing authority, assignee, and filing and
+  issue dates are kept, so the entry renders as a patent.
 - **Generic CURIE support** — any citekey prefix that isn't one of the
   dedicated handlers above (e.g. `uniprot:`, `chebi:`, `pdb:`, `ncbigene:`,
   `pubchem.compound:`) is resolved as a CURIE via the

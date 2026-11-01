@@ -37,6 +37,8 @@ The Structure of Scientific Revolutions [@isbn:9780226458113].
 
 Quarto filters documentation [@url:https://quarto.org/docs/extensions/filters.html].
 
+A patent [@url:https://patents.google.com/patent/US6285999B1/en].
+
 ## Wikidata
 
 Douglas Adams via Wikidata [@wikidata:Q42].
