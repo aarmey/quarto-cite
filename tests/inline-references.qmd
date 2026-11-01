@@ -1,0 +1,19 @@
+---
+title: "pandoc-cite inline references test"
+format: html
+references:
+  - id: inlineSampleKey
+    type: patent
+    title: Inline YAML reference sample
+    author:
+      - family: InlineAuthor
+        given: Test
+    number: PCT/US0000/000000
+filters:
+  - pandoc-cite
+---
+
+Testing a fetched citation [@doi:10.1038/nature12373] and a reference defined
+in YAML front matter [@inlineSampleKey].
+
+## References

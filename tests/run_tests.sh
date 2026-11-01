@@ -177,6 +177,30 @@ if [[ "$INTEGRATION" == "true" ]]; then
     fi
   fi
 
+  # -------------------------------------------------------------------------
+  # Inline references: verify `references:` given in YAML front matter are
+  # kept alongside fetched citations rather than overwritten.
+  # -------------------------------------------------------------------------
+  echo "Rendering inline-references.qmd (YAML references + fetched citation) ..."
+  quarto render tests/inline-references.qmd --output-dir tests/_output 2>&1
+
+  INLINE_OUTPUT="tests/_output/tests/inline-references.html"
+  if [[ ! -f "$INLINE_OUTPUT" ]]; then
+    echo "FAIL: $INLINE_OUTPUT not produced" >&2
+    FAILED=1
+  else
+    check_contains_in "Inline references: DOI citation rendered" "Kucsko" "$INLINE_OUTPUT"
+    check_contains_in "Inline references: YAML reference rendered" "InlineAuthor" "$INLINE_OUTPUT"
+
+    INLINE_COUNT=$(grep -c 'id="ref-inlineSampleKey"' "$INLINE_OUTPUT" || true)
+    if [[ "$INLINE_COUNT" -eq 1 ]]; then
+      echo "PASS: Inline references: YAML entry appears exactly once"
+    else
+      echo "FAIL: Inline references: expected YAML entry once, found $INLINE_COUNT" >&2
+      FAILED=1
+    fi
+  fi
+
   if [[ $FAILED -ne 0 ]]; then
     echo "" >&2
     echo "One or more integration tests FAILED." >&2
