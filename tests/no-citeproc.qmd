@@ -1,0 +1,11 @@
+---
+title: "pandoc-cite without citeproc"
+format: typst
+# The project _quarto.yml enables citeproc; turn it off here so the filter's
+# warning for a disabled citeproc can be tested.
+citeproc: false
+filters:
+  - pandoc-cite
+---
+
+A citation [@doi:10.1038/nature12373].

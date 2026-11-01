@@ -561,6 +561,44 @@ p, a = parse_citekey(":noprefix")
 ok("citekey empty prefix rejected", p == nil and a == nil)
 
 -- ---------------------------------------------------------------------------
+-- Tests: citeproc_warning
+-- ---------------------------------------------------------------------------
+-- Load the function's definition from the filter source itself, so these tests
+-- exercise the shipped code rather than a copy that could drift from it.
+local FILTER_PATH = path.join({
+  path.directory(arg[0]), -- this script's path under `pandoc lua`
+  "..",
+  "_extensions",
+  "pandoc-cite",
+  "pandoc-cite.lua",
+})
+
+local function load_filter_function(name)
+  local f = assert(io.open(FILTER_PATH, "r"))
+  local src = f:read("*all")
+  f:close()
+  -- A top-level local function runs until the first unindented `end`.
+  local body = src:match("\nlocal function " .. name .. "(%b().-\nend)\n")
+  assert(body, "could not find function " .. name .. " in " .. FILTER_PATH)
+  return assert(load("return function" .. body))()
+end
+
+local citeproc_warning = load_filter_function("citeproc_warning")
+
+ok("citeproc_warning silent when citeproc enabled", citeproc_warning("citeproc") == nil)
+local w = citeproc_warning(nil)
+ok(
+  "citeproc_warning warns when no citation method",
+  w ~= nil and w:find("method: none", 1, true) ~= nil
+)
+ok("citeproc_warning suggests the fix", w ~= nil and w:find("citeproc: true", 1, true) ~= nil)
+w = citeproc_warning("natbib")
+ok(
+  "citeproc_warning names other citation methods",
+  w ~= nil and w:find("method: natbib", 1, true) ~= nil
+)
+
+-- ---------------------------------------------------------------------------
 -- Summary
 -- ---------------------------------------------------------------------------
 print(string.format("\n%d passed, %d failed", PASS, FAIL))

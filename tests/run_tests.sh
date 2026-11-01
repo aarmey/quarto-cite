@@ -103,7 +103,9 @@ if [[ "$INTEGRATION" == "true" ]]; then
 
   # Second render should use cache (no network needed if offline)
   echo "Re-rendering to verify cache hits ..."
-  quarto render tests/integration.qmd --output-dir tests/_output 2>&1
+  # Keep the log: the citeproc check below reuses it instead of rendering again.
+  CITEPROC_LOG=$(quarto render tests/integration.qmd --output-dir tests/_output 2>&1)
+  echo "$CITEPROC_LOG"
 
   # -------------------------------------------------------------------------
   # Custom (non-default) CSL style: verify pandoc-cite doesn't interfere
@@ -175,6 +177,27 @@ if [[ "$INTEGRATION" == "true" ]]; then
       echo "FAIL: Mixed bibliography: expected local entry once, found $LOCAL_COUNT" >&2
       FAILED=1
     fi
+  fi
+
+  # -------------------------------------------------------------------------
+  # Citeproc disabled: verify the filter warns that resolved citations will
+  # not be rendered.
+  # -------------------------------------------------------------------------
+  echo "Rendering no-citeproc.qmd (citeproc not enabled) ..."
+  NO_CITEPROC_LOG=$(quarto render tests/no-citeproc.qmd --output-dir tests/_output 2>&1 || true)
+  if grep -q "citeproc is not enabled" <<<"$NO_CITEPROC_LOG"; then
+    echo "PASS: No citeproc: warning printed"
+  else
+    echo "FAIL: No citeproc: expected warning not printed" >&2
+    FAILED=1
+  fi
+
+  # integration.qmd enables citeproc, so its render (logged above) must not warn.
+  if grep -q "citeproc is not enabled" <<<"$CITEPROC_LOG"; then
+    echo "FAIL: Citeproc enabled: unexpected warning printed" >&2
+    FAILED=1
+  else
+    echo "PASS: Citeproc enabled: no warning"
   fi
 
   # -------------------------------------------------------------------------
