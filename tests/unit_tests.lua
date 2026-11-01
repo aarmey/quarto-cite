@@ -573,10 +573,16 @@ end
 
 ok("citeproc_warning silent when citeproc enabled", citeproc_warning("citeproc") == nil)
 local w = citeproc_warning(nil)
-ok("citeproc_warning warns when no citation method", w ~= nil and w:find("method: none", 1, true) ~= nil)
+ok(
+  "citeproc_warning warns when no citation method",
+  w ~= nil and w:find("method: none", 1, true) ~= nil
+)
 ok("citeproc_warning suggests the fix", w ~= nil and w:find("citeproc: true", 1, true) ~= nil)
 w = citeproc_warning("natbib")
-ok("citeproc_warning names other citation methods", w ~= nil and w:find("method: natbib", 1, true) ~= nil)
+ok(
+  "citeproc_warning names other citation methods",
+  w ~= nil and w:find("method: natbib", 1, true) ~= nil
+)
 
 -- ---------------------------------------------------------------------------
 -- Summary
