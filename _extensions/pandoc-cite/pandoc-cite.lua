@@ -641,13 +641,21 @@ end
 -- proper handling of numeric date-parts.
 -- ---------------------------------------------------------------------------
 
+-- Pandoc >= 3 represents a MetaList as a plain List with no `.t` tag, so
+-- check both forms. Without this, `references:` given in YAML front matter are
+-- silently dropped when fetched citations are injected.
+local function is_meta_list(v)
+  if v == nil then return false end
+  return v.t == "MetaList" or pandoc.utils.type(v) == "List"
+end
+
 local function build_references_meta(csl_items, existing_meta_refs)
   local ok, json_str = pcall(pandoc.json.encode, csl_items)
   if not ok then return nil end
 
   -- Inline any pre-existing references into the same list.
   local combined = csl_items
-  if existing_meta_refs and existing_meta_refs.t == "MetaList" then
+  if is_meta_list(existing_meta_refs) then
     -- existing_meta_refs is already in MetaValue form; we can't easily merge
     -- with our JSON list, so we let the round-trip handle only new items and
     -- merge at the MetaList level afterwards.
@@ -661,7 +669,7 @@ local function build_references_meta(csl_items, existing_meta_refs)
   local refs = tmp_doc.meta.references -- MetaList from the JSON round-trip
 
   -- Prepend any pre-existing front-matter references
-  if existing_meta_refs and existing_meta_refs.t == "MetaList" then
+  if is_meta_list(existing_meta_refs) then
     local merged = pandoc.MetaList({})
     for i = 1, #existing_meta_refs do
       merged:insert(existing_meta_refs[i])
